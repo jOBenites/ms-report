@@ -1,5 +1,7 @@
 package com.bank.msreport.service;
 
+import com.bank.msreport.cache.MovementViewCacheService;
+import com.bank.msreport.cache.ProductViewCacheService;
 import com.bank.msreport.dto.MovementResponse;
 import com.bank.msreport.dto.ProductResponse;
 import com.bank.msreport.model.MovementView;
@@ -16,6 +18,7 @@ import java.time.LocalDateTime;
  * Servicio reactivo de reportes del sistema bancario.
  * Expone consultas de productos por cliente y tipo, y movimientos
  * por producto en rango de fechas o ultimos N registros.
+ * Utiliza Redis como caché para reducir consultas a MongoDB.
  */
 @Service
 @RequiredArgsConstructor
@@ -25,6 +28,8 @@ public class ReportService {
 
     private final ProductViewRepository productViewRepository;
     private final MovementViewRepository movementViewRepository;
+    private final ProductViewCacheService productViewCacheService;
+    private final MovementViewCacheService movementViewCacheService;
 
     /**
      * Lista los productos de un cliente.
@@ -34,6 +39,7 @@ public class ReportService {
      */
     public Flux<ProductResponse> findProductsByCustomerId(String customerId) {
         return productViewRepository.findByCustomerId(customerId)
+                .flatMap(product -> productViewCacheService.put(product).thenReturn(product))
                 .map(this::toProductResponse);
     }
 
@@ -46,17 +52,21 @@ public class ReportService {
      */
     public Flux<ProductResponse> findProductsByCustomerAndType(String customerId, String productType) {
         return productViewRepository.findByCustomerIdAndProductType(customerId, productType)
+                .flatMap(product -> productViewCacheService.put(product).thenReturn(product))
                 .map(this::toProductResponse);
     }
 
     /**
      * Lista los ultimos 10 movimientos de un producto.
+     * Intenta obtener el conteo de Redis primero para optimizar.
      *
      * @param productId identificador del producto
      * @return Flux con los movimientos
      */
     public Flux<MovementResponse> findLastMovements(String productId) {
         return movementViewRepository.findTopNByProductIdOrderByOccurredAtDesc(productId, DEFAULT_MOVEMENT_LIMIT)
+                .flatMap(movement -> movementViewCacheService.putCount(productId, DEFAULT_MOVEMENT_LIMIT)
+                        .thenReturn(movement))
                 .map(this::toMovementResponse);
     }
 

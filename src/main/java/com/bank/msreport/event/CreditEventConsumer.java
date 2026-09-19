@@ -1,5 +1,6 @@
 package com.bank.msreport.event;
 
+import com.bank.msreport.cache.ProductViewCacheService;
 import com.bank.msreport.model.ProductView;
 import com.bank.msreport.repository.ProductViewRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +14,7 @@ import java.util.Map;
 
 /**
  * Consumidor de eventos de otorgamiento de creditos.
- * Registra el credito como producto en la vista local.
+ * Registra el credito como producto en la vista local y en caché Redis.
  */
 @Component
 @RequiredArgsConstructor
@@ -23,9 +24,11 @@ public class CreditEventConsumer {
     private static final String PRODUCT_TYPE_CREDIT = "CREDIT";
 
     private final ProductViewRepository productViewRepository;
+    private final ProductViewCacheService productViewCacheService;
 
     /**
      * Consume bank.credit.granted y registra el producto en la vista local.
+     * Actualiza tanto MongoDB como caché Redis.
      *
      * @param payload datos del evento (creditId, customerId, creditType, amount)
      */
@@ -36,6 +39,7 @@ public class CreditEventConsumer {
         ProductView product = new ProductView(creditId, customerId, PRODUCT_TYPE_CREDIT,
                 "ACTIVE", LocalDateTime.now());
         productViewRepository.save(product)
-                .subscribe(p -> log.info("Producto credito {} registrado en reportes", creditId));
+                .flatMap(productViewCacheService::put)
+                .subscribe(p -> log.info("Producto credito {} registrado en reportes (MongoDB + Redis)", creditId));
     }
 }

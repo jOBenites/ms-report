@@ -1,5 +1,6 @@
 package com.bank.msreport.event;
 
+import com.bank.msreport.cache.ProductViewCacheService;
 import com.bank.msreport.model.ProductView;
 import com.bank.msreport.repository.ProductViewRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +14,7 @@ import java.util.Map;
 
 /**
  * Consumidor de eventos de emision de tarjetas de credito.
- * Registra la tarjeta como producto en la vista local.
+ * Registra la tarjeta como producto en la vista local y en caché Redis.
  */
 @Component
 @RequiredArgsConstructor
@@ -23,9 +24,11 @@ public class CreditCardEventConsumer {
     private static final String PRODUCT_TYPE_CREDIT_CARD = "CREDIT_CARD";
 
     private final ProductViewRepository productViewRepository;
+    private final ProductViewCacheService productViewCacheService;
 
     /**
      * Consume bank.creditcard.issued y registra el producto en la vista local.
+     * Actualiza tanto MongoDB como caché Redis.
      *
      * @param payload datos del evento (cardId, customerId, cardType, creditLimit)
      */
@@ -36,6 +39,7 @@ public class CreditCardEventConsumer {
         ProductView product = new ProductView(cardId, customerId, PRODUCT_TYPE_CREDIT_CARD,
                 "ACTIVE", LocalDateTime.now());
         productViewRepository.save(product)
-                .subscribe(p -> log.info("Producto tarjeta de credito {} registrado en reportes", cardId));
+                .flatMap(productViewCacheService::put)
+                .subscribe(p -> log.info("Producto tarjeta de credito {} registrado en reportes (MongoDB + Redis)", cardId));
     }
 }

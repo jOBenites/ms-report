@@ -1,5 +1,6 @@
 package com.bank.msreport.event;
 
+import com.bank.msreport.cache.ProductViewCacheService;
 import com.bank.msreport.model.ProductView;
 import com.bank.msreport.repository.ProductViewRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +14,7 @@ import java.util.Map;
 
 /**
  * Consumidor de eventos de apertura de cuentas.
- * Registra la cuenta como producto en la vista local.
+ * Registra la cuenta como producto en la vista local y en caché Redis.
  */
 @Component
 @RequiredArgsConstructor
@@ -23,9 +24,11 @@ public class AccountEventConsumer {
     private static final String PRODUCT_TYPE_ACCOUNT = "ACCOUNT";
 
     private final ProductViewRepository productViewRepository;
+    private final ProductViewCacheService productViewCacheService;
 
     /**
      * Consume bank.account.opened y registra el producto en la vista local.
+     * Actualiza tanto MongoDB como caché Redis.
      *
      * @param payload datos del evento (accountId, customerId, accountType)
      */
@@ -36,6 +39,7 @@ public class AccountEventConsumer {
         ProductView product = new ProductView(accountId, customerId, PRODUCT_TYPE_ACCOUNT,
                 "ACTIVE", LocalDateTime.now());
         productViewRepository.save(product)
-                .subscribe(p -> log.info("Producto cuenta {} registrado en reportes", accountId));
+                .flatMap(productViewCacheService::put)
+                .subscribe(p -> log.info("Producto cuenta {} registrado en reportes (MongoDB + Redis)", accountId));
     }
 }

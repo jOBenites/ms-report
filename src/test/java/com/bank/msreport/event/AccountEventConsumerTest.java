@@ -1,5 +1,6 @@
 package com.bank.msreport.event;
 
+import com.bank.msreport.cache.ProductViewCacheService;
 import com.bank.msreport.model.ProductView;
 import com.bank.msreport.repository.ProductViewRepository;
 import org.junit.jupiter.api.Test;
@@ -27,12 +28,16 @@ class AccountEventConsumerTest {
     @Mock
     private ProductViewRepository productViewRepository;
 
+    @Mock
+    private ProductViewCacheService productViewCacheService;
+
     @InjectMocks
     private AccountEventConsumer accountEventConsumer;
 
     @Test
     void onAccountOpened_savesProductView() {
         when(productViewRepository.save(any(ProductView.class))).thenReturn(Mono.just(new ProductView()));
+        when(productViewCacheService.put(any(ProductView.class))).thenReturn(Mono.empty());
 
         Map<String, Object> payload = Map.of(
                 "accountId", "acc-1",
@@ -46,5 +51,6 @@ class AccountEventConsumerTest {
         assertEquals("acc-1", captor.getValue().getProductId());
         assertEquals("cust-1", captor.getValue().getCustomerId());
         assertEquals("ACCOUNT", captor.getValue().getProductType());
+        verify(productViewCacheService).put(any(ProductView.class));
     }
 }

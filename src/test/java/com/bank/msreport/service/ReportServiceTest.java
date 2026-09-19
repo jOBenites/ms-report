@@ -1,5 +1,7 @@
 package com.bank.msreport.service;
 
+import com.bank.msreport.cache.MovementViewCacheService;
+import com.bank.msreport.cache.ProductViewCacheService;
 import com.bank.msreport.dto.MovementResponse;
 import com.bank.msreport.dto.ProductResponse;
 import com.bank.msreport.model.MovementView;
@@ -21,6 +23,9 @@ import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 /**
@@ -35,6 +40,12 @@ class ReportServiceTest {
 
     @Mock
     private MovementViewRepository movementViewRepository;
+
+    @Mock
+    private ProductViewCacheService productViewCacheService;
+
+    @Mock
+    private MovementViewCacheService movementViewCacheService;
 
     @InjectMocks
     private ReportService reportService;
@@ -52,6 +63,7 @@ class ReportServiceTest {
     @Test
     void findProductsByCustomerId_success() {
         when(productViewRepository.findByCustomerId("cust-1")).thenReturn(Flux.just(productView));
+        when(productViewCacheService.put(any(ProductView.class))).thenReturn(Mono.empty());
 
         StepVerifier.create(reportService.findProductsByCustomerId("cust-1"))
                 .assertNext(result -> {
@@ -66,6 +78,7 @@ class ReportServiceTest {
     void findProductsByCustomerAndType_success() {
         when(productViewRepository.findByCustomerIdAndProductType("cust-1", "ACCOUNT"))
                 .thenReturn(Flux.just(productView));
+        when(productViewCacheService.put(any(ProductView.class))).thenReturn(Mono.empty());
 
         StepVerifier.create(reportService.findProductsByCustomerAndType("cust-1", "ACCOUNT"))
                 .assertNext(result -> assertEquals("ACCOUNT", result.getProductType()))
@@ -76,6 +89,7 @@ class ReportServiceTest {
     void findLastMovements_success() {
         when(movementViewRepository.findTopNByProductIdOrderByOccurredAtDesc("prod-1", 10))
                 .thenReturn(Flux.just(movementView));
+        when(movementViewCacheService.putCount(anyString(), anyLong())).thenReturn(Mono.empty());
 
         StepVerifier.create(reportService.findLastMovements("prod-1"))
                 .assertNext(result -> {

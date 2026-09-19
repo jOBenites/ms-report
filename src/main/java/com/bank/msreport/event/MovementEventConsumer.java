@@ -1,5 +1,6 @@
 package com.bank.msreport.event;
 
+import com.bank.msreport.cache.MovementViewCacheService;
 import com.bank.msreport.model.MovementView;
 import com.bank.msreport.repository.MovementViewRepository;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +15,7 @@ import java.util.Map;
 
 /**
  * Consumidor de eventos de movimientos registrados en cuentas, creditos y tarjetas.
- * Registra el movimiento en la vista local para generacion de reportes.
+ * Registra el movimiento en la vista local y actualiza caché Redis.
  */
 @Component
 @RequiredArgsConstructor
@@ -23,9 +24,11 @@ public class MovementEventConsumer {
     private static final Logger log = LoggerFactory.getLogger(MovementEventConsumer.class);
 
     private final MovementViewRepository movementViewRepository;
+    private final MovementViewCacheService movementViewCacheService;
 
     /**
      * Consume bank.movement.recorded y registra el movimiento en la vista local.
+     * Invalida el conteo de movimientos en caché Redis para ese producto.
      *
      * @param payload datos del evento (movementId, productId, productType, movementType, amount)
      */
@@ -42,6 +45,7 @@ public class MovementEventConsumer {
         MovementView movement = new MovementView(movementId, productId, productType,
                 movementType, amount, commission, LocalDateTime.now());
         movementViewRepository.save(movement)
-                .subscribe(m -> log.info("Movimiento {} registrado en reportes", movementId));
+                .flatMap(m -> movementViewCacheService.evict(productId).thenReturn(m))
+                .subscribe(m -> log.info("Movimiento {} registrado en reportes (MongoDB + Redis evict)", movementId));
     }
 }
