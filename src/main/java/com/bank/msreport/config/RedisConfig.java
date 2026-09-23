@@ -1,5 +1,6 @@
 package com.bank.msreport.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
@@ -17,15 +18,19 @@ public class RedisConfig {
 
     /**
      * Template reactivo de Redis con serializacion JSON para objetos.
+     * Usa el ObjectMapper de Spring Boot (con JavaTimeModule) para poder
+     * serializar los LocalDateTime de las vistas de reporte.
      *
      * @param connectionFactory fabrica de conexiones reactivas
+     * @param objectMapper ObjectMapper de Spring Boot con soporte de fechas
      * @return template configurado con serializador JSON
      */
     @Bean
     public ReactiveRedisTemplate<String, Object> reactiveRedisTemplate(
-            ReactiveRedisConnectionFactory connectionFactory) {
+            ReactiveRedisConnectionFactory connectionFactory, ObjectMapper objectMapper) {
         StringRedisSerializer keySerializer = new StringRedisSerializer();
-        Jackson2JsonRedisSerializer<Object> valueSerializer = new Jackson2JsonRedisSerializer<>(Object.class);
+        Jackson2JsonRedisSerializer<Object> valueSerializer =
+                new Jackson2JsonRedisSerializer<>(objectMapper, Object.class);
         RedisSerializationContext.RedisSerializationContextBuilder<String, Object> builder =
                 RedisSerializationContext.newSerializationContext(keySerializer);
         RedisSerializationContext<String, Object> context = builder
